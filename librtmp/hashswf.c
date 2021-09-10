@@ -31,6 +31,7 @@
 #include "http.h"
 
 #ifdef CRYPTO
+
 #ifdef USE_POLARSSL
 #include <polarssl/sha2.h>
 #ifndef SHA256_DIGEST_LENGTH
@@ -42,16 +43,16 @@
 #define HMAC_finish(ctx, dig, dlen)	dlen = SHA256_DIGEST_LENGTH; sha2_hmac_finish(&ctx, dig)
 #define HMAC_close(ctx)
 #elif defined(USE_GNUTLS)
-#include <nettle/hmac.h>
+#include <gnutls/gnutls.h>
+#include <gcrypt.h>
 #ifndef SHA256_DIGEST_LENGTH
 #define SHA256_DIGEST_LENGTH	32
 #endif
-#undef HMAC_CTX
-#define HMAC_CTX	struct hmac_sha256_ctx
-#define HMAC_setup(ctx, key, len)	hmac_sha256_set_key(&ctx, len, key)
-#define HMAC_crunch(ctx, buf, len)	hmac_sha256_update(&ctx, len, buf)
-#define HMAC_finish(ctx, dig, dlen)	dlen = SHA256_DIGEST_LENGTH; hmac_sha256_digest(&ctx, SHA256_DIGEST_LENGTH, dig)
-#define HMAC_close(ctx)
+#define HMAC_CTX	gcry_md_hd_t
+#define HMAC_setup(ctx, key, len)	gcry_md_open(&ctx, GCRY_MD_SHA256, GCRY_MD_FLAG_HMAC); gcry_md_setkey(ctx, key, len)
+#define HMAC_crunch(ctx, buf, len)	gcry_md_write(ctx, buf, len)
+#define HMAC_finish(ctx, dig, dlen)	dlen = SHA256_DIGEST_LENGTH; memcpy(dig, gcry_md_read(ctx, 0), dlen)
+#define HMAC_close(ctx)	gcry_md_close(ctx)
 #else	/* USE_OPENSSL */
 #include <openssl/ssl.h>
 #include <openssl/sha.h>
@@ -66,9 +67,9 @@
 extern void RTMP_TLS_Init();
 extern TLS_CTX RTMP_TLS_ctx;
 
-#include <zlib.h>
-
 #endif /* CRYPTO */
+
+#include <zlib.h>
 
 #define	AGENT	"Mozilla/5.0"
 
@@ -80,6 +81,7 @@ HTTP_get(struct HTTP_ctx *http, const char *url, HTTP_read_callback *cb)
   char hbuf[256];
   int port = 80;
 #ifdef CRYPTO
+
   int ssl = 0;
 #endif
   int hlen, flen = 0;
@@ -101,6 +103,7 @@ HTTP_get(struct HTTP_ctx *http, const char *url, HTTP_read_callback *cb)
   if (url[4] == 's')
     {
 #ifdef CRYPTO
+
       ssl = 1;
       port = 443;
       if (!RTMP_TLS_ctx)
@@ -141,7 +144,7 @@ HTTP_get(struct HTTP_ctx *http, const char *url, HTTP_read_callback *cb)
     return HTTPRES_LOST_CONNECTION;
   i =
     sprintf(sb.sb_buf,
-	    "GET %s HTTP/1.0\r\nUser-Agent: %s\r\nHost: %s\r\nReferer: %.*s\r\n",
+	    "GET %s HTTP/1.0\r\nUser-Agent: %s\r\nHost: %s\r\nReferrer: %.*s\r\n",
 	    path, AGENT, host, (int)(path - url + 1), url);
   if (http->date[0])
     i += sprintf(sb.sb_buf + i, "If-Modified-Since: %s\r\n", http->date);
@@ -154,6 +157,7 @@ HTTP_get(struct HTTP_ctx *http, const char *url, HTTP_read_callback *cb)
       goto leave;
     }
 #ifdef CRYPTO
+
   if (ssl)
     {
 #ifdef NO_SSL
@@ -163,7 +167,7 @@ HTTP_get(struct HTTP_ctx *http, const char *url, HTTP_read_callback *cb)
 #else
       TLS_client(RTMP_TLS_ctx, sb.sb_ssl);
       TLS_setfd(sb.sb_ssl, sb.sb_socket);
-      if (TLS_connect(sb.sb_ssl) < 0)
+      if ((i = TLS_connect(sb.sb_ssl)) < 0)
 	{
 	  RTMP_Log(RTMP_LOGERROR, "%s, TLS_Connect failed", __FUNCTION__);
 	  ret = HTTPRES_LOST_CONNECTION;
@@ -435,7 +439,7 @@ make_unix_time(char *s)
 /* Convert a Unix time to a network time string
  * Weekday, DD-MMM-YYYY HH:MM:SS GMT
  */
-static void
+void
 strtime(time_t * t, char *s)
 {
   struct tm *tm;
@@ -466,7 +470,7 @@ RTMP_HashSWF(const char *url, unsigned int *size, unsigned char *hash,
 
   date[0] = '\0';
 #ifdef _WIN32
-#ifdef XBMC4XBOX
+#ifdef _XBOX
   hpre.av_val = "Q:";
   hpre.av_len = 2;
   home.av_val = "\\UserData";

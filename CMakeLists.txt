@@ -9,20 +9,19 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -Wall -DNO_CRYPTO -D_GNU_SOURCE")
 add_executable(rtmp
         main.cpp
 
-        librtmp/rtmp_sys.h
-        librtmp/rtmp.h
-        librtmp/log.h
-        librtmp/http.h
-        librtmp/handshake.h
-        librtmp/dhgroups.h
-        librtmp/dh.h
-        librtmp/bytes.h
-        librtmp/amf.h
-
         librtmp/amf.c
+        librtmp/amf.h
+        librtmp/bytes.h
+        librtmp/dh.h
+        librtmp/dhgroups.h
+        librtmp/handshake.h
         librtmp/hashswf.c
+        librtmp/http.h
         librtmp/log.c
+        librtmp/log.h
         librtmp/parseurl.c
         librtmp/rtmp.c
+        librtmp/rtmp.h
+        librtmp/rtmp_sys.h
 
         )

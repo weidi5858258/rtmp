@@ -30,6 +30,10 @@
 #include "rtmp_sys.h"
 #include "log.h"
 
+// rtmp://ivi.bupt.edu.cn:1935/livetv/chcatv
+/*
+ url代表字符串,而*url代表第一个字符,即'r'
+ */
 int RTMP_ParseURL(const char *url, int *protocol, AVal *host, unsigned int *port,
                   AVal *playpath, AVal *app) {
     char *p, *end, *col, *ques, *slash;
@@ -38,22 +42,21 @@ int RTMP_ParseURL(const char *url, int *protocol, AVal *host, unsigned int *port
 
     *protocol = RTMP_PROTOCOL_RTMP;
     *port = 0;
-    playpath->av_len = 0;
     playpath->av_val = NULL;
-    app->av_len = 0;
+    playpath->av_len = 0;
     app->av_val = NULL;
+    app->av_len = 0;
 
     /* Old School Parsing */
 
     /* look for usual :// pattern */
-    p = strstr(url, "://");
+    p = strstr(url, "://");// "://ivi.bupt.edu.cn:1935/livetv/chcatv"
     if (!p) {
         RTMP_Log(RTMP_LOGERROR, "RTMP URL: No :// in url!");
         return FALSE;
     }
     {
-        int len = (int) (p - url);
-
+        int len = (int) (p - url);// 4
         if (len == 4 && strncasecmp(url, "rtmp", 4) == 0)
             *protocol = RTMP_PROTOCOL_RTMP;
         else if (len == 5 && strncasecmp(url, "rtmpt", 5) == 0)
@@ -78,18 +81,18 @@ int RTMP_ParseURL(const char *url, int *protocol, AVal *host, unsigned int *port
 
     parsehost:
     /* let's get the hostname */
-    p += 3;
+    p += 3;// "ivi.bupt.edu.cn:1935/livetv/chcatv"
 
     /* check for sudden death */
-    if (*p == 0) {
+    if (*p == 0) {// *p = 'i'
         RTMP_Log(RTMP_LOGWARNING, "No hostname in URL!");
         return FALSE;
     }
 
-    end = p + strlen(p);
-    col = strchr(p, ':');
-    ques = strchr(p, '?');
-    slash = strchr(p, '/');
+    end = p + strlen(p);      // ""
+    col = strchr(p, ':');  // ":1935/livetv/chcatv"
+    ques = strchr(p, '?'); // NULL
+    slash = strchr(p, '/');// "/livetv/chcatv"
 
     {
         int hostlen;
@@ -101,25 +104,25 @@ int RTMP_ParseURL(const char *url, int *protocol, AVal *host, unsigned int *port
             hostlen = col - p;
 
         if (hostlen < 256) {
-            host->av_val = p;
-            host->av_len = hostlen;
+            host->av_val = p;      // "ivi.bupt.edu.cn:1935/livetv/chcatv"
+            host->av_len = hostlen;// 15 主机部分的长度,即: ivi.bupt.edu.cn
             RTMP_Log(RTMP_LOGDEBUG, "Parsed host    : %.*s", hostlen, host->av_val);
         } else {
             RTMP_Log(RTMP_LOGWARNING, "Hostname exceeds 255 characters!");
         }
 
-        p += hostlen;
+        p += hostlen;// ":1935/livetv/chcatv"
     }
 
     /* get the port number if available */
     if (*p == ':') {
         unsigned int p2;
-        p++;
-        p2 = atoi(p);
+        p++;// "1935/livetv/chcatv"
+        p2 = atoi(p);// 字符串转化成整数(只转化数字): 1935
         if (p2 > 65535) {
             RTMP_Log(RTMP_LOGWARNING, "Invalid port number!");
         } else {
-            *port = p2;
+            *port = p2;// 1935
         }
     }
 
@@ -127,7 +130,7 @@ int RTMP_ParseURL(const char *url, int *protocol, AVal *host, unsigned int *port
         RTMP_Log(RTMP_LOGWARNING, "No application or playpath in URL!");
         return TRUE;
     }
-    p = slash + 1;
+    p = slash + 1;// "livetv/chcatv"
 
     {
         /* parse application
@@ -135,49 +138,46 @@ int RTMP_ParseURL(const char *url, int *protocol, AVal *host, unsigned int *port
          * rtmp://host[:port]/app[/appinstance][/...]
          * application = app[/appinstance]
          */
-
-        char *slash2, *slash3 = NULL, *slash4 = NULL;
+        char *slash2, *slash3 = NULL;
         int applen, appnamelen;
 
-        slash2 = strchr(p, '/');
+        slash2 = strchr(p, '/');// "/chcatv"
         if (slash2)
-            slash3 = strchr(slash2 + 1, '/');
-        if (slash3)
-            slash4 = strchr(slash3 + 1, '/');
+            slash3 = strchr(slash2 + 1, '/');// 从"chcatv"中查找'/',因为找不到,所以slash3 is NULL
 
-        applen = end - p; /* ondemand, pass all parameters as app */
+        // 13
+        applen = end - p;    /* ondemand, pass all parameters as app */
         appnamelen = applen; /* ondemand length */
 
-        if (ques && strstr(p,
-                           "slist=")) { /* whatever it is, the '?' and slist= means we need to use everything as app and parse plapath from slist= */
+        if (ques && strstr(p, "slist=")) {
+            /* whatever it is, the '?' and slist= means we need to use everything as app and parse plapath from slist= */
             appnamelen = ques - p;
         } else if (strncmp(p, "ondemand/", 9) == 0) {
             /* app = ondemand/foobar, only pass app=ondemand */
             applen = 8;
             appnamelen = 8;
-        } else { /* app!=ondemand, so app is app[/appinstance] */
-            if (slash4)
-                appnamelen = slash4 - p;
-            else if (slash3)
+        } else {
+            /* app!=ondemand, so app is app[/appinstance] */
+            if (slash3)
                 appnamelen = slash3 - p;
             else if (slash2)
-                appnamelen = slash2 - p;
+                appnamelen = slash2 - p;// 6
 
             applen = appnamelen;
         }
 
-        app->av_val = p;
-        app->av_len = applen;
+        app->av_val = p;     // "livetv/chcatv"
+        app->av_len = applen;// 6
         RTMP_Log(RTMP_LOGDEBUG, "Parsed app     : %.*s", applen, p);
 
-        p += appnamelen;
+        p += appnamelen;// "/chcatv"
     }
 
     if (*p == '/')
-        p++;
+        p++;// "chcatv"
 
-    if (end - p) {
-        AVal av = {p, end - p};
+    if (end - p) {// 相当于strlen(p)
+        AVal av = {p, end - p};// "chcatv" 6
         RTMP_ParsePlaypath(&av, playpath);
     }
 
@@ -201,8 +201,8 @@ void RTMP_ParsePlaypath(AVal *in, AVal *out) {
     int addMP3 = 0;
     int subExt = 0;
     const char *playpath = in->av_val;
-    const char *temp, *q, *ext = NULL;
     const char *ppstart = playpath;
+    const char *temp, *q, *ext = NULL;
     char *streamname, *destptr, *p;
 
     int pplen = in->av_len;
