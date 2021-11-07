@@ -34,13 +34,14 @@
 /*
  url代表字符串,而*url代表第一个字符,即'r'
  */
-int RTMP_ParseURL(const char *url, int *protocol, AVal *host, unsigned int *port,
+int RTMP_ParseURL(const char *url, int *protocol,
+                  AVal *host, unsigned int *port,
                   AVal *playpath, AVal *app) {
     char *p, *end, *col, *ques, *slash;
 
     RTMP_Log(RTMP_LOGDEBUG, "Parsing...");
 
-    *protocol = RTMP_PROTOCOL_RTMP;
+    *protocol = RTMP_PROTOCOL_RTMP;// 0
     *port = 0;
     playpath->av_val = NULL;
     playpath->av_len = 0;
@@ -56,8 +57,12 @@ int RTMP_ParseURL(const char *url, int *protocol, AVal *host, unsigned int *port
         return FALSE;
     }
     {
+        /*
+         strncasecmp()用来比较参数s1 和s2 字符串前n个字符，比较时会自动忽略大小写的差异。
+         若参数s1 和s2 字符串相同则返回0。s1 若大于s2 则返回大于0 的值，s1 若小于s2 则返回小于0 的值。
+         */
         int len = (int) (p - url);// 4
-        if (len == 4 && strncasecmp(url, "rtmp", 4) == 0)
+        if (len == 4 && strncasecmp(url, "rtmp", 4) == 0)// 以“rtmp”开头
             *protocol = RTMP_PROTOCOL_RTMP;
         else if (len == 5 && strncasecmp(url, "rtmpt", 5) == 0)
             *protocol = RTMP_PROTOCOL_RTMPT;
@@ -80,6 +85,7 @@ int RTMP_ParseURL(const char *url, int *protocol, AVal *host, unsigned int *port
     RTMP_Log(RTMP_LOGDEBUG, "Parsed protocol: %d", *protocol);
 
     parsehost:
+
     /* let's get the hostname */
     p += 3;// "ivi.bupt.edu.cn:1935/livetv/chcatv"
 
@@ -96,12 +102,14 @@ int RTMP_ParseURL(const char *url, int *protocol, AVal *host, unsigned int *port
 
     {
         int hostlen;
-        if (slash)
-            hostlen = slash - p;
-        else
+        if (slash) {
+            hostlen = slash - p;// 20
+        } else {
             hostlen = end - p;
-        if (col && col - p < hostlen)
-            hostlen = col - p;
+        }
+        if (col && (col - p) < hostlen) {
+            hostlen = col - p;// 15
+        }
 
         if (hostlen < 256) {
             host->av_val = p;      // "ivi.bupt.edu.cn:1935/livetv/chcatv"
@@ -138,17 +146,18 @@ int RTMP_ParseURL(const char *url, int *protocol, AVal *host, unsigned int *port
          * rtmp://host[:port]/app[/appinstance][/...]
          * application = app[/appinstance]
          */
-        char *slash2, *slash3 = NULL;
+        char *slash2 = NULL, *slash3 = NULL;
         int applen, appnamelen;
 
         slash2 = strchr(p, '/');// "/chcatv"
-        if (slash2)
+        if (slash2) {
             slash3 = strchr(slash2 + 1, '/');// 从"chcatv"中查找'/',因为找不到,所以slash3 is NULL
+        }
 
         // 13
         applen = end - p;    /* ondemand, pass all parameters as app */
         appnamelen = applen; /* ondemand length */
-
+        // p="livetv/chcatv"
         if (ques && strstr(p, "slist=")) {
             /* whatever it is, the '?' and slist= means we need to use everything as app and parse plapath from slist= */
             appnamelen = ques - p;
@@ -158,10 +167,11 @@ int RTMP_ParseURL(const char *url, int *protocol, AVal *host, unsigned int *port
             appnamelen = 8;
         } else {
             /* app!=ondemand, so app is app[/appinstance] */
-            if (slash3)
+            if (slash3) {
                 appnamelen = slash3 - p;
-            else if (slash2)
+            } else if (slash2) {
                 appnamelen = slash2 - p;// 6
+            }
 
             applen = appnamelen;
         }
@@ -173,8 +183,9 @@ int RTMP_ParseURL(const char *url, int *protocol, AVal *host, unsigned int *port
         p += appnamelen;// "/chcatv"
     }
 
-    if (*p == '/')
+    if (*p == '/') {
         p++;// "chcatv"
+    }
 
     if (end - p) {// 相当于strlen(p)
         AVal av = {p, end - p};// "chcatv" 6
@@ -200,12 +211,12 @@ void RTMP_ParsePlaypath(AVal *in, AVal *out) {
     int addMP4 = 0;
     int addMP3 = 0;
     int subExt = 0;
-    const char *playpath = in->av_val;
+    const char *playpath = in->av_val;// "chcatv"
     const char *ppstart = playpath;
+    int pplen = in->av_len;// 6
     const char *temp, *q, *ext = NULL;
     char *streamname, *destptr, *p;
 
-    int pplen = in->av_len;
 
     out->av_val = NULL;
     out->av_len = 0;
@@ -226,7 +237,7 @@ void RTMP_ParsePlaypath(AVal *in, AVal *out) {
         if (q)
             ext = q - 4;
         else
-            ext = &ppstart[pplen - 4];
+            ext = &(ppstart[pplen - 4]);// "catv"
         if ((strncmp(ext, ".f4v", 4) == 0) ||
             (strncmp(ext, ".mp4", 4) == 0)) {
             addMP4 = 1;

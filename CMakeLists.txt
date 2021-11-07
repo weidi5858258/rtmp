@@ -23,5 +23,4 @@ add_executable(rtmp
         librtmp/rtmp.c
         librtmp/rtmp.h
         librtmp/rtmp_sys.h
-
         )

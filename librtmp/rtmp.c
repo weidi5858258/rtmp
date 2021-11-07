@@ -639,27 +639,41 @@ int RTMP_SetOpt(RTMP *r, const AVal *opt, AVal *arg) {
  rtmp://192.168.0.108:1935/live
  rtmp://ivi.bupt.edu.cn:1935/livetv/chcatv
 
- r->Link.hostname: 192.168.0.108或ivi.bupt.edu.cn
+ rtmp->Link.hostname: 192.168.0.108或ivi.bupt.edu.cn
  port: 1935
- r->Link.app: live或livetv
- r->Link.playpath0: chcatv
+ rtmp->Link.app: live或livetv
+ rtmp->Link.playpath0: chcatv
  */
-int RTMP_SetupURL(RTMP *r, char *url) {
+int RTMP_SetupURL(RTMP *rtmp, const char *url) {
     AVal opt, arg;
-    char *p1, *p2, *ptr = strchr(url, ' ');// 地址中是否包含空格(还没有碰到过这样的地址)
+    char *p1, *p2, *ptr = strchr(url, ' ');// 地址中是否包含空格(还没有碰到过这样的地址)，如果这个地址中不包含空格，则ptr为NULL
     int ret, len;
     unsigned int port = 0;
 
-    if (ptr)// NULL
+    if (ptr) {// NULL
         *ptr = '\0';
+    }
 
-    len = strlen(url);
-    ret = RTMP_ParseURL(url, &r->Link.protocol, &r->Link.hostname,
-                        &port, &r->Link.playpath0, &r->Link.app);
-    if (!ret)
+    len = strlen(url);// 41
+    ret = RTMP_ParseURL(url, &rtmp->Link.protocol, &rtmp->Link.hostname,
+                        &port, &rtmp->Link.playpath0, &rtmp->Link.app);
+    if (!ret) {
         return ret;
-    r->Link.port = port;
-    r->Link.playpath = r->Link.playpath0;
+    }
+    rtmp->Link.port = port;// 1935
+    rtmp->Link.playpath = rtmp->Link.playpath0;
+    /*
+     rtmp->Link.protocol = RTMP_PROTOCOL_RTMP
+     rtmp->Link.hostname.av_val = "ivi.bupt.edu.cn:1935/livetv/chcatv";
+     rtmp->Link.hostname.av_len = 15;
+     rtmp->Link.playpath0.av_val = "chcatv";
+     rtmp->Link.playpath0.av_len = 6;
+     rtmp->Link.playpath.av_val = "chcatv";
+     rtmp->Link.playpath.av_len = 6;
+     rtmp->Link.app.av_val = "livetv/chcatv";
+     rtmp->Link.app.av_len = 6;
+     rtmp->Link.port = 1935;
+     */
 
     while (ptr) {// NULL
         *ptr++ = '\0';
@@ -700,45 +714,47 @@ int RTMP_SetupURL(RTMP *r, char *url) {
         }
         arg.av_len = p2 - arg.av_val;
 
-        ret = RTMP_SetOpt(r, &opt, &arg);
+        ret = RTMP_SetOpt(rtmp, &opt, &arg);
         if (!ret)
             return ret;
     }
 
-    if (!r->Link.tcUrl.av_len) {
-        r->Link.tcUrl.av_val = url;
-        if (r->Link.app.av_len) {
-            if (r->Link.app.av_val < url + len) {
+    if (!rtmp->Link.tcUrl.av_len) {
+        rtmp->Link.tcUrl.av_val = url;
+        if (rtmp->Link.app.av_len) {
+            if (rtmp->Link.app.av_val < url + len) {
                 /* if app is part of original url, just use it */
-                r->Link.tcUrl.av_len = r->Link.app.av_len + (r->Link.app.av_val - url);
+                rtmp->Link.tcUrl.av_len = rtmp->Link.app.av_len + (rtmp->Link.app.av_val - url);
             } else {
-                len = r->Link.hostname.av_len + r->Link.app.av_len + sizeof("rtmpte://:65535/");
-                r->Link.tcUrl.av_val = malloc(len);
-                r->Link.tcUrl.av_len = snprintf(r->Link.tcUrl.av_val, len,
-                                                "%s://%.*s:%d/%.*s",
-                                                RTMPProtocolStringsLower[r->Link.protocol],
-                                                r->Link.hostname.av_len, r->Link.hostname.av_val,
-                                                r->Link.port,
-                                                r->Link.app.av_len, r->Link.app.av_val);
-                r->Link.lFlags |= RTMP_LF_FTCU;
+                len = rtmp->Link.hostname.av_len + rtmp->Link.app.av_len + sizeof("rtmpte://:65535/");
+                rtmp->Link.tcUrl.av_val = malloc(len);
+                rtmp->Link.tcUrl.av_len = snprintf(rtmp->Link.tcUrl.av_val, len,
+                                                   "%s://%.*s:%d/%.*s",
+                                                   RTMPProtocolStringsLower[rtmp->Link.protocol],
+                                                   rtmp->Link.hostname.av_len, rtmp->Link.hostname.av_val,
+                                                   rtmp->Link.port,
+                                                   rtmp->Link.app.av_len, rtmp->Link.app.av_val);
+                rtmp->Link.lFlags |= RTMP_LF_FTCU;
             }
         } else {
-            r->Link.tcUrl.av_len = strlen(url);
+            rtmp->Link.tcUrl.av_len = strlen(url);
         }
     }
+    // rtmp->Link.tcUrl.av_val = "rtmp://ivi.bupt.edu.cn:1935/livetv/chcatv";
+    // rtmp->Link.tcUrl.av_len = 34;
 
 #ifdef CRYPTO
-    RTMP_HashSWF(r->Link.swfUrl.av_val, &r->Link.SWFSize,
-      (unsigned char *)r->Link.SWFHash, r->Link.swfAge);
+    RTMP_HashSWF(rtmp->Link.swfUrl.av_val, &rtmp->Link.SWFSize,
+      (unsigned char *)rtmp->Link.SWFHash, rtmp->Link.swfAge);
 #endif
 
-    if (r->Link.port == 0) {
-        if (r->Link.protocol & RTMP_FEATURE_SSL)
-            r->Link.port = 443;
-        else if (r->Link.protocol & RTMP_FEATURE_HTTP)
-            r->Link.port = 80;
+    if (rtmp->Link.port == 0) {
+        if (rtmp->Link.protocol & RTMP_FEATURE_SSL)
+            rtmp->Link.port = 443;
+        else if (rtmp->Link.protocol & RTMP_FEATURE_HTTP)
+            rtmp->Link.port = 80;
         else
-            r->Link.port = 1935;
+            rtmp->Link.port = 1935;
     }
     return TRUE;
 }
@@ -768,33 +784,34 @@ add_addr_info(struct sockaddr_in *service, AVal *host, int port) {
     // htons(): 将主机字节顺序转换为网络字节顺序
     service->sin_port = htons(port);// 36615
     finish:
-    if (hostname != host->av_val)
+    if (hostname != host->av_val) {
         free(hostname);
+    }
     return ret;
 }
 
 int
-RTMP_Connect0(RTMP *r, struct sockaddr *service) {
+RTMP_Connect0(RTMP *rtmp, struct sockaddr *service) {
     int on = 1;
-    r->m_sb.sb_timedout = FALSE;
-    r->m_pausing = 0;
-    r->m_fDuration = 0.0;
+    rtmp->m_sb.sb_timedout = FALSE;
+    rtmp->m_pausing = 0;
+    rtmp->m_fDuration = 0.0;
 
-    r->m_sb.sb_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (r->m_sb.sb_socket != -1) {
-        if (connect(r->m_sb.sb_socket, service, sizeof(struct sockaddr)) < 0) {
+    rtmp->m_sb.sb_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (rtmp->m_sb.sb_socket != -1) {
+        if (connect(rtmp->m_sb.sb_socket, service, sizeof(struct sockaddr)) < 0) {
             int err = GetSockError();
             RTMP_Log(RTMP_LOGERROR, "%s, failed to connect socket. %d (%s)",
                      __FUNCTION__, err, strerror(err));
-            RTMP_Close(r);
+            RTMP_Close(rtmp);
             return FALSE;
         }
 
-        if (r->Link.socksport) {
+        if (rtmp->Link.socksport) {
             RTMP_Log(RTMP_LOGDEBUG, "%s ... SOCKS negotiation", __FUNCTION__);
-            if (!SocksNegotiate(r)) {
+            if (!SocksNegotiate(rtmp)) {
                 RTMP_Log(RTMP_LOGERROR, "%s, SOCKS negotiation failed.", __FUNCTION__);
-                RTMP_Close(r);
+                RTMP_Close(rtmp);
                 return FALSE;
             }
         }
@@ -805,14 +822,14 @@ RTMP_Connect0(RTMP *r, struct sockaddr *service) {
 
     /* set timeout */
     {
-        SET_RCVTIMEO(tv, r->Link.timeout);
-        if (setsockopt(r->m_sb.sb_socket, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv))) {
+        SET_RCVTIMEO(tv, rtmp->Link.timeout);
+        if (setsockopt(rtmp->m_sb.sb_socket, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv))) {
             RTMP_Log(RTMP_LOGERROR, "%s, Setting socket timeout to %ds failed!",
-                     __FUNCTION__, r->Link.timeout);
+                     __FUNCTION__, rtmp->Link.timeout);
         }
     }
 
-    setsockopt(r->m_sb.sb_socket, IPPROTO_TCP, TCP_NODELAY, (char *) &on, sizeof(on));
+    setsockopt(rtmp->m_sb.sb_socket, IPPROTO_TCP, TCP_NODELAY, (char *) &on, sizeof(on));
 
     return TRUE;
 }
@@ -867,36 +884,42 @@ struct in_addr {
 };
 struct sockaddr_in {
 	sa_family_t    sin_family; // 地址族
-	struct in_addr sin_addr;   // 32位IP地址
+	struct in_addr sin_addr;   // 32位IP地址(typedef uint32_t in_addr_t)
 	uint16_t       sin_port;   // 16位TCP/UDP端口号
 	char           siz_zero[8];// 不使用
 }
  */
 int
-RTMP_Connect(RTMP *r, RTMPPacket *cp) {
-    struct sockaddr_in service;
-    if (!r->Link.hostname.av_len)
+RTMP_Connect(RTMP *rtmp, RTMPPacket *cp) {
+    if (!rtmp->Link.hostname.av_len) {
         return FALSE;
-
-    memset(&service, 0, sizeof(struct sockaddr_in));
-    service.sin_family = AF_INET;
-
-    if (r->Link.socksport) {
-        /* Connect via SOCKS */
-        if (!add_addr_info(&service, &r->Link.sockshost, r->Link.socksport))
-            return FALSE;
-    } else {
-        /* Connect directly */
-        if (!add_addr_info(&service, &r->Link.hostname, r->Link.port))
-            return FALSE;
     }
 
-    if (!RTMP_Connect0(r, (struct sockaddr *) &service))
+    struct sockaddr_in service;
+    memset(&service, 0, sizeof(struct sockaddr_in));
+    service.sin_family = AF_INET;// 2
+
+    RTMP_Log(RTMP_LOGINFO, "RTMP_Connect() rtmp->Link.socksport: %d", rtmp->Link.socksport);
+
+    if (rtmp->Link.socksport) {
+        /* Connect via SOCKS */
+        if (!add_addr_info(&service, &rtmp->Link.sockshost, rtmp->Link.socksport)) {
+            return FALSE;
+        }
+    } else {
+        /* Connect directly */
+        if (!add_addr_info(&service, &rtmp->Link.hostname, rtmp->Link.port)) {
+            return FALSE;
+        }
+    }
+
+    if (!RTMP_Connect0(rtmp, (struct sockaddr *) &service)) {
         return FALSE;
+    }
 
-    r->m_bSendCounter = TRUE;
+    rtmp->m_bSendCounter = TRUE;
 
-    return RTMP_Connect1(r, cp);
+    return RTMP_Connect1(rtmp, cp);
 }
 
 static int

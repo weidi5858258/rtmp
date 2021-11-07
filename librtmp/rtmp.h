@@ -49,6 +49,7 @@ extern "C"
 #define RTMP_FEATURE_WRITE    0x10    /* publish, not play */
 #define RTMP_FEATURE_HTTP2    0x20    /* server-side rtmpt */
 
+
 #define RTMP_PROTOCOL_UNDEFINED    -1
 #define RTMP_PROTOCOL_RTMP      0
 #define RTMP_PROTOCOL_RTMPE     RTMP_FEATURE_ENC
@@ -158,11 +159,11 @@ typedef struct RTMP_LNK {
 
     int swfAge;
 
-    int protocol;
+    int protocol;                 /* RTMP_PROTOCOL_RTMP */
     int timeout;                  /* connection timeout in seconds */
 
     unsigned short socksport;
-    unsigned short port;
+    unsigned short port;          /* 1935 */
 
 #ifdef CRYPTO
 
@@ -270,7 +271,7 @@ void RTMP_UpdateBufferMS(RTMP *r);
 
 int RTMP_SetOpt(RTMP *r, const AVal *opt, AVal *arg);
 
-int RTMP_SetupURL(RTMP *r, char *url);
+int RTMP_SetupURL(RTMP *rtmp, const char *url);
 
 void RTMP_SetupStream(RTMP *r, int protocol,
                       AVal *hostname,
@@ -289,11 +290,11 @@ void RTMP_SetupStream(RTMP *r, int protocol,
                       int dStart,
                       int dStop, int bLiveStream, long int timeout);
 
-int RTMP_Connect(RTMP *r, RTMPPacket *cp);
+int RTMP_Connect(RTMP *rtmp, RTMPPacket *cp);
 
 struct sockaddr;
 
-int RTMP_Connect0(RTMP *r, struct sockaddr *svc);
+int RTMP_Connect0(RTMP *rtmp, struct sockaddr *svc);
 
 int RTMP_Connect1(RTMP *r, RTMPPacket *cp);
 
